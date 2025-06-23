@@ -63,6 +63,29 @@ class LocationHistory extends HiveObject {
     };
   }
 
+  String get simpleName {
+    var name = '';
+    if (complex != null && complex!['name'] != null) {
+      name += complex!['name'];
+    }
+
+    if (place != null) {
+      if (place!['name'] != null) {
+        if (name.isNotEmpty) {
+          name += ' ';
+        }
+        name += '${place!['name']}';
+      }
+      if (place!['tags'] != null) {
+        name += '(${place!['tags']})';
+      }
+      if (place!['address'] != null) {
+        name += '\n${place!['address']}';
+      }
+    }
+    return name;
+  }
+
   String get displayName {
     var complexId = 'complex_id: ';
     var complexName = 'complex_name: ';

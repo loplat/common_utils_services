@@ -191,21 +191,15 @@ class LocationUtils {
 // 위치 히스토리 관리 클래스
 class LocationHistoryManager {
   late Box<LocationHistory> locationHistoryBox;
-  List<LocationHistory> _locationHistory = [];
   late StreamSubscription? _subscription;
-  late NotificationService? _notificationService;
   PlengiListener? _listener;
 
   Future<void> initialize(PlengiListener? plengiListener) async {
     try {
-      await NotificationService().initialize();
-      _notificationService = NotificationService();
       // 이벤트 스트림 구독
       Stream<dynamic> stream = EventChannel(
         'plengi.ai/toFlutter',
       ).receiveBroadcastStream();
-
-      _listener = plengiListener;
 
       _subscription = stream.listen(
         (dynamic location) {
@@ -225,7 +219,6 @@ class LocationHistoryManager {
       locationHistoryBox = await Hive.openBox<LocationHistory>(
         'locationHistory',
       );
-      loadLocationHistory();
     } catch (e) {
       print('위치 매니저 초기화 실패: $e');
     }
@@ -235,16 +228,8 @@ class LocationHistoryManager {
     return response.split('\n')[0];
   }
 
-  List<LocationHistory> get locationHistory => _locationHistory;
-
-  void loadLocationHistory() {
-    try {
-      _locationHistory = locationHistoryBox.values.toList();
-      print('위치 매니저 초기화: ${_locationHistory.length}');
-    } catch (e) {
-      print('위치 매니저 초기화 실패: $e');
-    }
-  }
+  List<LocationHistory> get locationHistory =>
+      locationHistoryBox.values.toList();
 
   void checkLocationNeedsInteraction(String location) {
     try {
@@ -261,23 +246,24 @@ class LocationHistoryManager {
       final Map<String, dynamic> locationData = json.decode(location);
 
       // 히스토리가 있는데 위치의 유의미한 변화가 없으면 add 하지 않음
-      if (_locationHistory.isNotEmpty) {
+      final List<LocationHistory> currentHistory = locationHistoryBox.values
+          .toList();
+      if (currentHistory.isNotEmpty) {
         if (!LocationUtils.isLocationSignificant(
           locationData,
-          _locationHistory.first.toJson(),
+          currentHistory.first.toJson(),
         )) {
           return;
         }
       }
 
       final locationHistory = LocationHistory.fromJson(locationData);
-      _locationHistory.insert(0, locationHistory);
       locationHistoryBox.add(locationHistory);
 
       // 크기 제한 초과 시 오래된 데이터 제거
-      while (_locationHistory.length > LocationUtils.maxLocationHistory) {
-        final oldest = _locationHistory.removeLast();
-        oldest.delete();
+      while (locationHistoryBox.length > LocationUtils.maxLocationHistory) {
+        final oldestKey = locationHistoryBox.keyAt(0);
+        locationHistoryBox.delete(oldestKey);
       }
     } catch (e) {
       print('위치 히스토리 추가 실패: $e');
@@ -285,7 +271,6 @@ class LocationHistoryManager {
   }
 
   void clear() {
-    _locationHistory.clear();
     locationHistoryBox.clear();
   }
 

@@ -63,6 +63,22 @@ class LocationHistory extends HiveObject {
     };
   }
 
+  String get placeName {
+    var name = '';
+    if (place != null) {
+      if (place!['name'] != null) {
+        if (name.isNotEmpty) {
+          name += ' ';
+        }
+        name += '${place!['name']}';
+      }
+      if (place!['tags'] != null) {
+        name += '(${place!['tags']})';
+      }
+    }
+    return name;
+  }
+
   String get simpleName {
     var name = '';
     if (complex != null && complex!['name'] != null) {
@@ -96,16 +112,16 @@ class LocationHistory extends HiveObject {
     }
 
     if (place != null && place!['name'] != null) {
-      return '$complexName$complexId${place!['name']}(${place!['address']}), lat: ${location!['lat']}, lng: ${location!['lng']}';
+      return '${formattedTime}, ${complexName}, ${complexId}\n${place!['name']}(${place!['address']})';
     }
     if (location != null) {
-      return '$complexName $complexId lat: ${location!['lat']}, lng: ${location!['lng']}, accuracy: ${location!['accuracy']}';
+      return '${formattedTime}, ${complexName}, ${complexId} lat: ${location!['lat']}, lng: ${location!['lng']}, accuracy: ${location!['accuracy']}';
     }
     if (district != null) {
       final lv2 = district!['lv2_name'];
       final lv3 = district!['lv3_name'];
       if (lv2 != null && lv3 != null) {
-        return '$complexName $complexId $lv2 $lv3';
+        return '${formattedTime}, ${complexName}, ${complexId}, address: $lv2 $lv3';
       }
     }
     return '';

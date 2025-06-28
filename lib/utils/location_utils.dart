@@ -5,15 +5,13 @@ import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:common_utils_services/models/location_history.dart';
 import 'package:common_utils_services/models/location.dart';
-import 'package:common_utils_services/services/ai_services.dart';
-import 'package:common_utils_services/services/notification_service.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 // 위치 데이터 콜백 타입 정의
 typedef PlengiListener = void Function(dynamic location);
 
 class LocationUtils {
   static const platform = MethodChannel('plengi.ai/fromFlutter');
-  static const int maxLocationHistory = 10;
   // 위도 1도당 거리 (약 111km)
   static const double latDegreeToMeters = 111000.0;
   // 경도 1도당 거리 (위도에 따라 변하지만, 한국 기준으로 약 88.8km)
@@ -113,11 +111,11 @@ class LocationUtils {
     Map<String, dynamic> currentLocation,
     Map<String, dynamic> lastLocation,
   ) {
-    final double? newLat = currentLocation['lat']?.toDouble();
-    final double? newLng = currentLocation['lng']?.toDouble();
+    final double? newLat = currentLocation['place']?['lat']?.toDouble();
+    final double? newLng = currentLocation['place']?['lng']?.toDouble();
     if (newLat != null && newLng != null) {
-      final double? lastLat = lastLocation['lat']?.toDouble();
-      final double? lastLng = lastLocation['lng']?.toDouble();
+      final double? lastLat = lastLocation['place']?['lat']?.toDouble();
+      final double? lastLng = lastLocation['place']?['lng']?.toDouble();
       if (lastLat != null && lastLng != null) {
         final double latDiff = (newLat - lastLat).abs();
         final double lngDiff = (newLng - lastLng).abs();
@@ -167,24 +165,32 @@ class LocationUtils {
     }
 
     // 둘 중 하나라도 loplat_id가 없는 경우 위도/경도로 거리 계산
-    final double? newLat = currentLocation['lat']?.toDouble();
-    final double? newLng = currentLocation['lng']?.toDouble();
+    final double? newLat = currentLocation['place']?['lat']?.toDouble();
+    final double? newLng = currentLocation['place']?['lng']?.toDouble();
     if (newLat != null && newLng != null) {
-      final double? lastLat = lastLocation['lat']?.toDouble();
-      final double? lastLng = lastLocation['lng']?.toDouble();
+      final double? lastLat = lastLocation['place']?['lat']?.toDouble();
+      final double? lastLng = lastLocation['place']?['lng']?.toDouble();
 
       if (lastLat != null && lastLng != null) {
         final double distance = calculateDistance(
           currentLocation,
           lastLocation,
         );
-        if (distance < 100) {
+        if (distance > 100) {
           return true; // 100m 미만이면 추가하지 않음
         }
       }
     }
-
+    showToast('이미 오늘 방문한 장소입니다.');
     return false;
+  }
+
+  static void showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+    );
   }
 }
 
@@ -193,16 +199,24 @@ class LocationHistoryManager {
   late Box<LocationHistory> locationHistoryBox;
   late StreamSubscription? _subscription;
   PlengiListener? _listener;
+  static int _maxLocationHistory = 10;
 
-  Future<void> initialize(PlengiListener? plengiListener) async {
+  Future<void> initialize(
+    int maxLocationHistory,
+    PlengiListener? plengiListener,
+  ) async {
     try {
+      _maxLocationHistory = maxLocationHistory;
       // 이벤트 스트림 구독
       Stream<dynamic> stream = EventChannel(
         'plengi.ai/toFlutter',
       ).receiveBroadcastStream();
 
+      _listener = plengiListener;
+
       _subscription = stream.listen(
         (dynamic location) {
+          addLocationHistory(location);
           if (_listener != null) {
             _listener!(location);
           }
@@ -244,26 +258,45 @@ class LocationHistoryManager {
   void addLocationHistory(String location) {
     try {
       final Map<String, dynamic> locationData = json.decode(location);
-
-      // 히스토리가 있는데 위치의 유의미한 변화가 없으면 add 하지 않음
       final List<LocationHistory> currentHistory = locationHistoryBox.values
           .toList();
-      if (currentHistory.isNotEmpty) {
-        if (!LocationUtils.isLocationSignificant(
-          locationData,
-          currentHistory.first.toJson(),
-        )) {
-          return;
-        }
+
+      // 히스토리가 비어있거나 날짜가 다르거나 위치가 유의미하면 추가
+      bool shouldAdd = currentHistory.isEmpty;
+
+      if (!shouldAdd) {
+        final lastLocation = currentHistory.last;
+        final currentTime = DateTime.now();
+
+        // 날짜 비교 - 날짜가 다르면 새로운 방문으로 간주
+        final currentDate = DateTime(
+          currentTime.year,
+          currentTime.month,
+          currentTime.day,
+        );
+        final lastDate = DateTime(
+          lastLocation.timestamp.year,
+          lastLocation.timestamp.month,
+          lastLocation.timestamp.day,
+        );
+
+        shouldAdd =
+            currentDate != lastDate ||
+            LocationUtils.isLocationSignificant(
+              locationData,
+              lastLocation.toJson(),
+            );
       }
 
-      final locationHistory = LocationHistory.fromJson(locationData);
-      locationHistoryBox.add(locationHistory);
+      if (shouldAdd) {
+        final locationHistory = LocationHistory.fromJson(locationData);
+        locationHistoryBox.add(locationHistory);
 
-      // 크기 제한 초과 시 오래된 데이터 제거
-      while (locationHistoryBox.length > LocationUtils.maxLocationHistory) {
-        final oldestKey = locationHistoryBox.keyAt(0);
-        locationHistoryBox.delete(oldestKey);
+        // 크기 제한 초과 시 오래된 데이터 제거
+        while (locationHistoryBox.length > _maxLocationHistory) {
+          final oldestKey = locationHistoryBox.keyAt(0);
+          locationHistoryBox.delete(oldestKey);
+        }
       }
     } catch (e) {
       print('위치 히스토리 추가 실패: $e');

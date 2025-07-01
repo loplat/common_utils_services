@@ -6,11 +6,16 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:common_utils_services/models/message.dart';
 
 class AIServices {
-  static const String _baseUrl = 'https://api.anthropic.com/v1';
-  static String? _apiKey;
-  static bool _isInitialized = false;
+  static final AIServices _instance = AIServices._internal();
+  factory AIServices() => _instance;
+  AIServices._internal();
+  static AIServices get instance => _instance;
 
-  static Future<void> initialize() async {
+  final String _baseUrl = 'https://api.anthropic.com/v1';
+  String? _apiKey;
+  bool _isInitialized = false;
+
+  Future<void> initialize() async {
     if (!_isInitialized) {
       if (!kIsWeb) {
         try {
@@ -20,14 +25,13 @@ class AIServices {
           print('Error loading .env file: $e');
         }
       }
-
       _apiKey ??= const String.fromEnvironment('ANTHROPIC_API_KEY');
       _isInitialized = true;
     }
   }
 
   // 마지막 유효한 assistant 메시지의 인덱스를 찾는 헬퍼 메서드
-  static int findLastValidAssistantIndex(List<Message> messageHistory) {
+  int findLastValidAssistantIndex(List<Message> messageHistory) {
     for (int i = messageHistory.length - 1; i >= 0; i--) {
       final message = messageHistory[i];
       if (message.role == 'assistant' && message.content.isNotEmpty) {
@@ -37,7 +41,7 @@ class AIServices {
     return -1; // 유효한 assistant 메시지를 찾지 못한 경우
   }
 
-  static List<Message> filterValidMessage(List<Message> messageHistory) {
+  List<Message> filterValidMessage(List<Message> messageHistory) {
     final List<Message> validMessages = [];
     final int totalMessages = messageHistory.length;
 
@@ -72,11 +76,10 @@ class AIServices {
       }
       // assistant 메시지는 user와 짝이 맞는 경우만 위에서 처리됨
     }
-
     return validMessages;
   }
 
-  static Future<String> getAIResponse(
+  Future<String> getAIResponse(
     String userMessage,
     List<Message> messageHistory,
   ) async {
@@ -114,13 +117,13 @@ class AIServices {
           ...recentMessages,
           {'role': 'user', 'content': userMessage},
         ],
-        'mcp_servers': [
-          {
-            'type': 'url',
-            'url': 'https://f32a-121-134-127-253.ngrok-free.app/sse',
-            'name': 'restaurants_finder',
-          },
-        ],
+        // 'mcp_servers': [
+        //   {
+        //     'type': 'url',
+        //     'url': 'https://f32a-121-134-127-253.ngrok-free.app/sse',
+        //     'name': 'restaurants_finder',
+        //   },
+        // ],
         'tools': [
           {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
         ],
@@ -138,7 +141,8 @@ class AIServices {
     }
   }
 
-  static Stream<String> getAIResponseStream(
+  Stream<String> getAIResponseStream(
+    String prompt,
     String userMessage,
     List<Message> messageHistory,
   ) async* {
@@ -158,7 +162,6 @@ class AIServices {
       // TODO: prompt
       // SettingsService에서 프롬프트 가져오기
       //final prompt = _settingsService.getPrompt();
-      final prompt = "";
 
       final request = http.Request('POST', Uri.parse('$_baseUrl/messages'));
 
@@ -179,13 +182,13 @@ class AIServices {
           {'role': 'user', 'content': userMessage},
         ],
         'stream': true,
-        'mcp_servers': [
-          {
-            'type': 'url',
-            'url': 'https://f32a-121-134-127-253.ngrok-free.app/sse',
-            'name': 'restaurants_finder',
-          },
-        ],
+        // 'mcp_servers': [
+        //   {
+        //     'type': 'url',
+        //     'url': 'https://f32a-121-134-127-253.ngrok-free.app/sse',
+        //     'name': 'restaurants_finder',
+        //   },
+        // ],
         'tools': [
           {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
         ],

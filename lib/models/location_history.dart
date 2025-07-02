@@ -42,9 +42,19 @@ class LocationHistory extends HiveObject {
     final formattedTime =
         '${timestamp.year}/${timestamp.month}/${timestamp.day} ${timestamp.hour}:${timestamp.minute.toString().padLeft(2, '0')}';
 
+    // place name을 이모지로 변환
+    Map<String, dynamic>? place = json['place'] as Map<String, dynamic>?;
+    if (place != null && place['name'] != null) {
+      if (place['name'] == 'Place1') {
+        place['name'] = '🏠';
+      } else if (place['name'] == 'Place2') {
+        place['name'] = '🏢';
+      }
+    }
+
     return LocationHistory(
       location: locationJson,
-      place: json['place'] as Map<String, dynamic>?,
+      place: place,
       district: json['district'] as Map<String, dynamic>?,
       timestamp: timestamp,
       formattedTime: formattedTime,

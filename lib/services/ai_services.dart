@@ -80,6 +80,7 @@ class AIServices {
   }
 
   Future<String> getAIResponse(
+    String prompt,
     String userMessage,
     List<Message> messageHistory,
   ) async {
@@ -94,11 +95,6 @@ class AIServices {
 
     // 유효한 메시지 중 필요한 메시지만 필터링
     final recentMessages = filterValidMessage(messageHistory);
-
-    // TODO: prompt
-    // SettingsService에서 프롬프트 가져오기
-    //final prompt = _settingsService.getPrompt();
-    final prompt = "";
 
     // 기존 동기 응답 메서드
     final response = await http.post(
@@ -117,13 +113,13 @@ class AIServices {
           ...recentMessages,
           {'role': 'user', 'content': userMessage},
         ],
-        // 'mcp_servers': [
-        //   {
-        //     'type': 'url',
-        //     'url': 'https://f32a-121-134-127-253.ngrok-free.app/sse',
-        //     'name': 'restaurants_finder',
-        //   },
-        // ],
+        'mcp_servers': [
+          {
+            'type': 'url',
+            'url': 'https://server-url/sse',
+            'name': 'restaurants_finder',
+          },
+        ],
         'tools': [
           {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
         ],
@@ -159,10 +155,6 @@ class AIServices {
       // 유효한 메시지 중 필요한 메시지만 필터링
       final recentMessages = filterValidMessage(messageHistory);
 
-      // TODO: prompt
-      // SettingsService에서 프롬프트 가져오기
-      //final prompt = _settingsService.getPrompt();
-
       final request = http.Request('POST', Uri.parse('$_baseUrl/messages'));
 
       request.headers.addAll({
@@ -182,13 +174,13 @@ class AIServices {
           {'role': 'user', 'content': userMessage},
         ],
         'stream': true,
-        // 'mcp_servers': [
-        //   {
-        //     'type': 'url',
-        //     'url': 'https://f32a-121-134-127-253.ngrok-free.app/sse',
-        //     'name': 'restaurants_finder',
-        //   },
-        // ],
+        'mcp_servers': [
+          {
+            'type': 'url',
+            'url': 'https://server-url/sse',
+            'name': 'restaurants_finder',
+          },
+        ],
         'tools': [
           {"type": "web_search_20250305", "name": "web_search", "max_uses": 5},
         ],
